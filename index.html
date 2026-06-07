@@ -604,7 +604,7 @@ const TABLES = {
       '4': { name: 'ipNetToMediaType',        role: 'metric' },
     }
   },
-  '1.3.6.1.2.1.4.24.3': {
+  '1.3.6.1.2.1.4.24.4': {
     name: 'ipCidrRouteTable', mib: 'IP-FORWARD-MIB',
     label: 'IP CIDR Route Table',
     group: 'routing',
@@ -621,20 +621,34 @@ const TABLES = {
       '10': { name: 'ipCidrRouteNextHopAS', role: 'metric' },
       '11': { name: 'ipCidrRouteMetric1',   role: 'metric' },
       '12': { name: 'ipCidrRouteMetric2',   role: 'metric' },
-      '15': { name: 'ipCidrRouteStatus',    role: 'metric' },
+      '13': { name: 'ipCidrRouteMetric3',   role: 'metric' },
+      '14': { name: 'ipCidrRouteMetric4',   role: 'metric' },
+      '15': { name: 'ipCidrRouteMetric5',   role: 'metric' },
+      '16': { name: 'ipCidrRouteStatus',    role: 'metadata' },
     }
   },
-  '1.3.6.1.2.1.4.24.4': {
+  '1.3.6.1.2.1.4.24.7': {
     name: 'inetCidrRouteTable', mib: 'IP-FORWARD-MIB',
     label: 'Inet CIDR Route Table',
     group: 'routing',
     columns: {
-      '7':  { name: 'inetCidrRouteIfIndex', role: 'tag',  tagName: 'route_if_index' },
-      '8':  { name: 'inetCidrRouteType',    role: 'metric' },
-      '9':  { name: 'inetCidrRouteProto',   role: 'metric' },
-      '10': { name: 'inetCidrRouteAge',     role: 'metric' },
-      '15': { name: 'inetCidrRouteMetric1', role: 'metric' },
-      '16': { name: 'inetCidrRouteStatus',  role: 'metric' },
+      '1':  { name: 'inetCidrRouteDestType',    role: 'index' },
+      '2':  { name: 'inetCidrRouteDest',         role: 'index' },
+      '3':  { name: 'inetCidrRoutePfxLen',       role: 'index' },
+      '4':  { name: 'inetCidrRoutePolicy',       role: 'index' },
+      '5':  { name: 'inetCidrRouteNextHopType',  role: 'index' },
+      '6':  { name: 'inetCidrRouteNextHop',      role: 'index' },
+      '7':  { name: 'inetCidrRouteIfIndex',      role: 'tag',  tagName: 'route_if_index' },
+      '8':  { name: 'inetCidrRouteType',         role: 'metric' },
+      '9':  { name: 'inetCidrRouteProto',        role: 'metric' },
+      '10': { name: 'inetCidrRouteAge',          role: 'metric' },
+      '11': { name: 'inetCidrRouteNextHopAS',    role: 'metric' },
+      '12': { name: 'inetCidrRouteMetric1',      role: 'metric' },
+      '13': { name: 'inetCidrRouteMetric2',      role: 'metric' },
+      '14': { name: 'inetCidrRouteMetric3',      role: 'metric' },
+      '15': { name: 'inetCidrRouteMetric4',      role: 'metric' },
+      '16': { name: 'inetCidrRouteMetric5',      role: 'metric' },
+      '17': { name: 'inetCidrRouteStatus',       role: 'metadata' },
     }
   },
   '1.3.6.1.2.1.6.13': {
