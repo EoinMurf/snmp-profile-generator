@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNMP Profile Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: #1a1d27;
+    border-bottom: 1px solid #2d3148;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header svg { flex-shrink: 0; }
+  header h1 { font-size: 18px; font-weight: 600; color: #f1f5f9; }
+  header p { font-size: 13px; color: #64748b; margin-top: 2px; }
+  .main { flex: 1; display: flex; gap: 0; }
+  .left-panel {
+    width: 380px;
+    flex-shrink: 0;
+    background: #1a1d27;
+    border-right: 1px solid #2d3148;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 16px;
+  }
+  .right-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed #374151;
+    border-radius: 10px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #0f1117;
+  }
+  .drop-zone:hover, .drop-zone.dragging {
+    border-color: #6366f1;
+    background: #1e1b4b22;
+  }
+  .drop-zone.has-file { border-color: #22c55e; background: #14532d22; }
+  .drop-zone svg { margin: 0 auto 10px; display: block; opacity: 0.5; }
+  .drop-zone.has-file svg { opacity: 1; color: #22c55e; }
+  .drop-zone p { font-size: 13px; color: #64748b; }
+  .drop-zone .filename { font-size: 12px; color: #22c55e; margin-top: 6px; font-weight: 500; word-break: break-all; }
+  #file-input { display: none; }
+
+  /* Stats panel */
+  .stats {
+    background: #0f1117;
+    border-radius: 8px;
+    padding: 14px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .stats.visible { display: flex; }
+  .stats h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 4px; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 13px; }
+  .stat-row .label { color: #94a3b8; }
+  .stat-row .value { color: #f1f5f9; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat-row .value.highlight { color: #6366f1; }
+  .device-info {
+    background: #1e1b4b33;
+    border: 1px solid #4338ca44;
+    border-radius: 8px;
+    padding: 12px;
+    display: none;
+  }
+  .device-info.visible { display: block; }
+  .device-info .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #818cf8; margin-bottom: 6px; }
+  .device-info .vendor { font-size: 14px; font-weight: 600; color: #f1f5f9; }
+  .device-info .sysdescr { font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4; word-break: break-word; }
+  .device-info .sysoid { font-size: 11px; color: #6366f1; margin-top: 4px; font-family: monospace; }
+
+  /* Split download button */
+  .split-btn-wrap { position: relative; display: flex; }
+  .split-main { border-radius: 6px 0 0 6px !important; border-right: 1px solid #3730a3 !important; }
+  .split-arrow {
+    border-radius: 0 6px 6px 0 !important;
+    padding: 6px 8px !important;
+    min-width: 0;
+  }
+  .export-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #1e2235;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    min-width: 200px;
+    z-index: 100;
+    overflow: hidden;
+    box-shadow: 0 8px 24px #00000066;
+  }
+  .export-menu.open { display: block; }
+  .export-menu-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #475569;
+    padding: 8px 12px 6px;
+  }
+  .export-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .export-item:hover { background: #252a40; color: #f1f5f9; }
+  .export-badge {
+    font-size: 10px;
+    background: #2d3148;
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: #64748b;
+  }
+
+  /* Output area */
+  .output-area {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .output-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #161929;
+    border-bottom: 1px solid #2d3148;
+  }
+  .output-toolbar .left { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; }
+  .output-toolbar .actions { display: flex; gap: 8px; }
+  .btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-secondary {
+    background: #1e2235;
+    color: #94a3b8;
+    border: 1px solid #2d3148;
+  }
+  .btn-secondary:hover { background: #252a40; color: #e2e8f0; }
+  .btn-primary {
+    background: #4f46e5;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #4338ca; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  pre.yaml-output {
+    flex: 1;
+    margin: 0;
+    padding: 20px;
+    font-family: 'SF Mono', 'Fira Code', 'Monaco', monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    background: #0b0d14;
+    color: #e2e8f0;
+    overflow: auto;
+    white-space: pre;
+    tab-size: 2;
+  }
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #374151;
+    padding: 40px;
+    text-align: center;
+  }
+  .empty-state svg { margin-bottom: 16px; }
+  .empty-state h2 { font-size: 16px; margin-bottom: 8px; color: #4b5563; }
+  .empty-state p { font-size: 13px; line-height: 1.5; max-width: 320px; }
+
+  /* YAML syntax highlighting */
+  .yaml-key { color: #7dd3fc; }
+  .yaml-string { color: #86efac; }
+  .yaml-number { color: #fda4af; }
+  .yaml-comment { color: #475569; font-style: italic; }
+  .yaml-bool { color: #fbbf24; }
+  .yaml-list { color: #c084fc; }
+
+  /* Options */
+  .options-section h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 10px;
+  }
+  .option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #1e2235;
+  }
+  .option-row:last-child { border-bottom: none; }
+  .option-label { font-size: 13px; color: #94a3b8; }
+  .toggle {
+    width: 36px; height: 20px;
+    background: #2d3148;
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    border: none;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    background: #64748b;
+    border-radius: 50%;
+    top: 3px; left: 3px;
+    transition: all 0.2s;
+  }
+  .toggle.on { background: #4f46e5; }
+  .toggle.on::after { left: 19px; background: #fff; }
+
+  /* Warnings */
+  .warnings {
+    padding: 12px 16px;
+    background: #1c1006;
+    border-bottom: 1px solid #92400e44;
+    display: none;
+    font-size: 12px;
+    color: #fbbf24;
+    gap: 6px;
+    flex-direction: column;
+  }
+  .warnings.visible { display: flex; }
+
+  /* Process button */
+  .process-btn {
+    width: 100%;
+    padding: 10px;
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .process-btn:hover:not(:disabled) { background: #4338ca; }
+  .process-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .process-btn.loading { background: #312e81; }
+
+  /* MIB server status */
+  .mib-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    background: #0f1117;
+    border: 1px solid #1e2235;
+  }
+  .mib-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #374151;
+  }
+  .mib-dot.online  { background: #22c55e; box-shadow: 0 0 5px #22c55e66; }
+  .mib-dot.offline { background: #f59e0b; }
+  .mib-dot.loading { background: #6366f1; animation: pulse 1.2s infinite; }
+  .mib-label { color: #64748b; flex: 1; }
+  .mib-label strong { color: #94a3b8; font-weight: 500; }
+  .mib-label a { color: #6366f1; text-decoration: none; }
+  .mib-label a:hover { text-decoration: underline; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .resolving-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #1e1b4b22;
+    border: 1px solid #4338ca44;
+    border-radius: 7px;
+    font-size: 11px;
+    color: #818cf8;
+  }
+  .resolving-bar.visible { display: flex; }
+  .spinner {
+    width: 12px; height: 12px;
+    border: 2px solid #4338ca44;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <rect width="28" height="28" rx="6" fill="#4f46e5"/>
+    <path d="M7 14h14M14 7v14" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="14" cy="14" r="4" stroke="white" stroke-width="1.5" fill="none"/>
+  </svg>
+  <div>
+    <h1>SNMP Profile Generator</h1>
+    <p>Drop an snmpwalk file to generate a device profile YAML</p>
+  </div>
+</header>
+
+<div class="main">
+  <div class="left-panel">
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <svg id="drop-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p>Drop snmpwalk file here</p>
+      <p style="font-size:11px;margin-top:4px;color:#374151">or click to browse</p>
+      <div class="filename" id="filename-label" style="display:none"></div>
+    </div>
+    <input type="file" id="file-input" accept="*/*">
+
+    <!-- Device info -->
+    <div class="device-info" id="device-info">
+      <div class="label">Detected Device</div>
+      <div class="vendor" id="device-vendor">—</div>
+      <div class="sysoid" id="device-sysoid"></div>
+      <div class="sysdescr" id="device-sysdescr"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats" id="stats-panel">
+      <h3>Walk Summary</h3>
+      <div class="stat-row"><span class="label">Total OIDs</span><span class="value" id="stat-total">—</span></div>
+      <div class="stat-row"><span class="label">Scalar metrics</span><span class="value highlight" id="stat-scalars">—</span></div>
+      <div class="stat-row"><span class="label">Tables detected</span><span class="value highlight" id="stat-tables">—</span></div>
+      <div class="stat-row"><span class="label">Table columns</span><span class="value" id="stat-columns">—</span></div>
+      <div class="stat-row"><span class="label">Enterprise OIDs</span><span class="value" id="stat-unknown">—</span></div>
+    </div>
+
+    <!-- Options -->
+    <div class="options-section">
+      <h3>Profile Options</h3>
+      <div class="option-row">
+        <span class="option-label">Include string tags</span>
+        <button class="toggle on" id="opt-tags" onclick="toggleOption(this)"></button>
+      </div>
+      <div class="option-row">
+        <span class="option-label">Include IP tables</span>
+        <button class="toggle on" id="opt-ip-tables" onclick="toggleOption(this)"></button>
+      </div>
+      <div class="option-row">
+        <span class="option-label">Include ARP/routing</span>
+        <button class="toggle" id="opt-routing" onclick="toggleOption(this)"></button>
+      </div>
+      <div class="option-row">
+        <span class="option-label">High-capacity (64-bit)</span>
+        <button class="toggle on" id="opt-hc" onclick="toggleOption(this)"></button>
+      </div>
+    </div>
+
+    <!-- MIB enrichment status -->
+    <div class="mib-status" id="mib-status">
+      <div class="mib-dot loading" id="mib-dot"></div>
+      <span class="mib-label" id="mib-label">Checking MIB server…</span>
+    </div>
+    <div class="resolving-bar" id="resolving-bar">
+      <div class="spinner"></div>
+      <span id="resolving-text">Resolving OID names via Observium…</span>
+    </div>
+
+    <button class="process-btn" id="process-btn" onclick="processFile()" disabled>
+      Generate Profile
+    </button>
+  </div>
+
+  <div class="right-panel">
+    <div class="warnings" id="warnings"></div>
+
+    <div class="output-area">
+      <div class="output-toolbar" id="output-toolbar" style="display:none">
+        <div class="left">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" opacity="0.5"><path d="M2 1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/></svg>
+          <span id="output-filename">profile.yaml</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="copyYaml()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
+          <div class="split-btn-wrap">
+            <button class="btn btn-primary split-main" onclick="downloadYaml('generic')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download .yaml
+            </button>
+            <button class="btn btn-primary split-arrow" onclick="toggleExportMenu(event)" title="Export for specific tool">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M2 3.5l3 3 3-3"/></svg>
+            </button>
+            <div class="export-menu" id="export-menu">
+              <div class="export-menu-label">Export for tool</div>
+              <div class="export-item" onclick="downloadYaml('datadog')">
+                <span>Datadog SNMP</span><span class="export-badge">v2 profile</span>
+              </div>
+              <div class="export-item" onclick="downloadYaml('newrelic')">
+                <span>New Relic</span><span class="export-badge">ktranslate</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" id="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <h2>No profile generated yet</h2>
+        <p>Drop an snmpwalk file on the left and click "Generate Profile".</p>
+      </div>
+
+      <pre class="yaml-output" id="yaml-output" style="display:none"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── OID Knowledge Base ───────────────────────────────────────────────────────
+
+const SCALARS = {
+  '1.3.6.1.2.1.1.1.0': { name: 'sysDescr',          mib: 'SNMPv2-MIB', type: 'string',  role: 'metadata' },
+  '1.3.6.1.2.1.1.2.0': { name: 'sysObjectID',        mib: 'SNMPv2-MIB', type: 'oid',     role: 'metadata' },
+  '1.3.6.1.2.1.1.3.0': { name: 'sysUpTimeInstance',  mib: 'SNMPv2-MIB', type: 'timeticks', role: 'metric' },
+  '1.3.6.1.2.1.1.4.0': { name: 'sysContact',         mib: 'SNMPv2-MIB', type: 'string',  role: 'metadata' },
+  '1.3.6.1.2.1.1.5.0': { name: 'sysName',            mib: 'SNMPv2-MIB', type: 'string',  role: 'tag' },
+  '1.3.6.1.2.1.1.6.0': { name: 'sysLocation',        mib: 'SNMPv2-MIB', type: 'string',  role: 'tag' },
+  '1.3.6.1.2.1.1.7.0': { name: 'sysServices',        mib: 'SNMPv2-MIB', type: 'integer', role: 'metadata' },
+  '1.3.6.1.2.1.2.1.0': { name: 'ifNumber',           mib: 'IF-MIB',     type: 'integer', role: 'metric' },
+  '1.3.6.1.2.1.4.1.0': { name: 'ipForwarding',       mib: 'IP-MIB',     type: 'integer', role: 'metric' },
+  '1.3.6.1.2.1.4.2.0': { name: 'ipDefaultTTL',       mib: 'IP-MIB',     type: 'integer', role: 'metadata' },
+  '1.3.6.1.2.1.4.3.0': { name: 'ipInReceives',       mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.4.0': { name: 'ipInHdrErrors',      mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.5.0': { name: 'ipInAddrErrors',     mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.6.0': { name: 'ipForwDatagrams',    mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.7.0': { name: 'ipInUnknownProtos',  mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.8.0': { name: 'ipInDiscards',       mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.9.0': { name: 'ipInDelivers',       mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.10.0': { name: 'ipOutRequests',     mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.11.0': { name: 'ipOutDiscards',     mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.12.0': { name: 'ipOutNoRoutes',     mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.13.0': { name: 'ipReasmTimeout',    mib: 'IP-MIB',     type: 'integer', role: 'metadata' },
+  '1.3.6.1.2.1.4.14.0': { name: 'ipReasmReqds',      mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.15.0': { name: 'ipReasmOKs',        mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.16.0': { name: 'ipReasmFails',      mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.17.0': { name: 'ipFragOKs',         mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.18.0': { name: 'ipFragFails',       mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.19.0': { name: 'ipFragCreates',     mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.4.23.0': { name: 'ipRoutingDiscards', mib: 'IP-MIB',     type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.1.0':  { name: 'tcpRtoAlgorithm',  mib: 'TCP-MIB',    type: 'integer', role: 'metadata' },
+  '1.3.6.1.2.1.6.2.0':  { name: 'tcpRtoMin',         mib: 'TCP-MIB',    type: 'integer', role: 'metadata' },
+  '1.3.6.1.2.1.6.3.0':  { name: 'tcpRtoMax',         mib: 'TCP-MIB',    type: 'integer', role: 'metadata' },
+  '1.3.6.1.2.1.6.4.0':  { name: 'tcpMaxConn',        mib: 'TCP-MIB',    type: 'integer', role: 'metadata' },
+  '1.3.6.1.2.1.6.5.0':  { name: 'tcpActiveOpens',    mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.6.0':  { name: 'tcpPassiveOpens',   mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.7.0':  { name: 'tcpAttemptFails',   mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.8.0':  { name: 'tcpEstabResets',    mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.9.0':  { name: 'tcpCurrEstab',      mib: 'TCP-MIB',    type: 'gauge',   role: 'metric' },
+  '1.3.6.1.2.1.6.10.0': { name: 'tcpInSegs',         mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.11.0': { name: 'tcpOutSegs',        mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.12.0': { name: 'tcpRetransSegs',    mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.14.0': { name: 'tcpInErrs',         mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.6.15.0': { name: 'tcpOutRsts',        mib: 'TCP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.7.1.0':  { name: 'udpInDatagrams',    mib: 'UDP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.7.2.0':  { name: 'udpNoPorts',        mib: 'UDP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.7.3.0':  { name: 'udpInErrors',       mib: 'UDP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.7.4.0':  { name: 'udpOutDatagrams',   mib: 'UDP-MIB',    type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.11.1.0': { name: 'snmpInPkts',        mib: 'SNMPv2-MIB', type: 'counter', role: 'metric' },
+  '1.3.6.1.2.1.11.2.0': { name: 'snmpOutPkts',       mib: 'SNMPv2-MIB', type: 'counter', role: 'metric' },
+};
+
+// Table definitions: tableOID → { name, mib, columns: { colNum → {name, role} } }
+const TABLES = {
+  '1.3.6.1.2.1.2.2': {
+    name: 'ifTable', mib: 'IF-MIB',
+    label: 'Interface Table',
+    group: 'interfaces',
+    columns: {
+      '1':  { name: 'ifIndex',           role: 'index' },
+      '2':  { name: 'ifDescr',           role: 'tag',    tagName: 'interface' },
+      '3':  { name: 'ifType',            role: 'tag',    tagName: 'if_type' },
+      '4':  { name: 'ifMtu',             role: 'metric' },
+      '5':  { name: 'ifSpeed',           role: 'metric' },
+      '6':  { name: 'ifPhysAddress',     role: 'tag',    tagName: 'if_mac' },
+      '7':  { name: 'ifAdminStatus',     role: 'metric' },
+      '8':  { name: 'ifOperStatus',      role: 'metric' },
+      '9':  { name: 'ifLastChange',      role: 'metric' },
+      '10': { name: 'ifInOctets',        role: 'metric' },
+      '11': { name: 'ifInUcastPkts',     role: 'metric' },
+      '12': { name: 'ifInNUcastPkts',    role: 'metric' },
+      '13': { name: 'ifInDiscards',      role: 'metric' },
+      '14': { name: 'ifInErrors',        role: 'metric' },
+      '15': { name: 'ifInUnknownProtos', role: 'metric' },
+      '16': { name: 'ifOutOctets',       role: 'metric' },
+      '17': { name: 'ifOutUcastPkts',    role: 'metric' },
+      '18': { name: 'ifOutNUcastPkts',   role: 'metric' },
+      '19': { name: 'ifOutDiscards',     role: 'metric' },
+      '20': { name: 'ifOutErrors',       role: 'metric' },
+      '21': { name: 'ifOutQLen',         role: 'metric' },
+    }
+  },
+  '1.3.6.1.2.1.31.1.1': {
+    name: 'ifXTable', mib: 'IF-MIB',
+    label: 'Interface Extended Table',
+    group: 'interfaces',
+    columns: {
+      '1':  { name: 'ifName',                   role: 'tag',    tagName: 'interface_name' },
+      '2':  { name: 'ifInMulticastPkts',         role: 'metric' },
+      '3':  { name: 'ifInBroadcastPkts',         role: 'metric' },
+      '4':  { name: 'ifOutMulticastPkts',        role: 'metric' },
+      '5':  { name: 'ifOutBroadcastPkts',        role: 'metric' },
+      '6':  { name: 'ifHCInOctets',              role: 'metric', hc: true },
+      '7':  { name: 'ifHCInUcastPkts',           role: 'metric', hc: true },
+      '8':  { name: 'ifHCInMulticastPkts',       role: 'metric', hc: true },
+      '9':  { name: 'ifHCInBroadcastPkts',       role: 'metric', hc: true },
+      '10': { name: 'ifHCOutOctets',             role: 'metric', hc: true },
+      '11': { name: 'ifHCOutUcastPkts',          role: 'metric', hc: true },
+      '12': { name: 'ifHCOutMulticastPkts',      role: 'metric', hc: true },
+      '13': { name: 'ifHCOutBroadcastPkts',      role: 'metric', hc: true },
+      '15': { name: 'ifHighSpeed',               role: 'metric' },
+      '18': { name: 'ifAlias',                   role: 'tag',    tagName: 'if_alias' },
+    }
+  },
+  '1.3.6.1.2.1.3.1': {
+    name: 'atTable', mib: 'AT-MIB',
+    label: 'ARP Table',
+    group: 'routing',
+    columns: {
+      '1': { name: 'atIfIndex',      role: 'index' },
+      '2': { name: 'atPhysAddress',  role: 'tag',   tagName: 'arp_mac' },
+      '3': { name: 'atNetAddress',   role: 'tag',   tagName: 'arp_ip' },
+    }
+  },
+  '1.3.6.1.2.1.4.20': {
+    name: 'ipAddrTable', mib: 'IP-MIB',
+    label: 'IP Address Table',
+    group: 'ip',
+    columns: {
+      '1': { name: 'ipAdEntAddr',         role: 'index' },
+      '2': { name: 'ipAdEntIfIndex',      role: 'tag',   tagName: 'ip_if_index' },
+      '3': { name: 'ipAdEntNetMask',      role: 'tag',   tagName: 'ip_netmask' },
+      '4': { name: 'ipAdEntBcastAddr',    role: 'tag',   tagName: 'ip_bcast' },
+      '5': { name: 'ipAdEntReasmMaxSize', role: 'metric' },
+    }
+  },
+  '1.3.6.1.2.1.4.22': {
+    name: 'ipNetToMediaTable', mib: 'IP-MIB',
+    label: 'IP-to-MAC Table (ARP)',
+    group: 'routing',
+    columns: {
+      '1': { name: 'ipNetToMediaIfIndex',     role: 'index' },
+      '2': { name: 'ipNetToMediaPhysAddress', role: 'tag',  tagName: 'mac' },
+      '3': { name: 'ipNetToMediaNetAddress',  role: 'tag',  tagName: 'ip_address' },
+      '4': { name: 'ipNetToMediaType',        role: 'metric' },
+    }
+  },
+  '1.3.6.1.2.1.4.24.3': {
+    name: 'ipCidrRouteTable', mib: 'IP-FORWARD-MIB',
+    label: 'IP CIDR Route Table',
+    group: 'routing',
+    columns: {
+      '1':  { name: 'ipCidrRouteDest',      role: 'index' },
+      '2':  { name: 'ipCidrRouteMask',      role: 'index' },
+      '3':  { name: 'ipCidrRouteTos',       role: 'index' },
+      '4':  { name: 'ipCidrRouteNextHop',   role: 'index' },
+      '5':  { name: 'ipCidrRouteIfIndex',   role: 'tag',  tagName: 'route_if_index' },
+      '6':  { name: 'ipCidrRouteType',      role: 'metric' },
+      '7':  { name: 'ipCidrRouteProto',     role: 'metric' },
+      '8':  { name: 'ipCidrRouteAge',       role: 'metric' },
+      '9':  { name: 'ipCidrRouteInfo',      role: 'metadata' },
+      '10': { name: 'ipCidrRouteNextHopAS', role: 'metric' },
+      '11': { name: 'ipCidrRouteMetric1',   role: 'metric' },
+      '12': { name: 'ipCidrRouteMetric2',   role: 'metric' },
+      '15': { name: 'ipCidrRouteStatus',    role: 'metric' },
+    }
+  },
+  '1.3.6.1.2.1.4.24.4': {
+    name: 'inetCidrRouteTable', mib: 'IP-FORWARD-MIB',
+    label: 'Inet CIDR Route Table',
+    group: 'routing',
+    columns: {
+      '7':  { name: 'inetCidrRouteIfIndex', role: 'tag',  tagName: 'route_if_index' },
+      '8':  { name: 'inetCidrRouteType',    role: 'metric' },
+      '9':  { name: 'inetCidrRouteProto',   role: 'metric' },
+      '10': { name: 'inetCidrRouteAge',     role: 'metric' },
+      '15': { name: 'inetCidrRouteMetric1', role: 'metric' },
+      '16': { name: 'inetCidrRouteStatus',  role: 'metric' },
+    }
+  },
+  '1.3.6.1.2.1.6.13': {
+    name: 'tcpConnTable', mib: 'TCP-MIB',
+    label: 'TCP Connection Table',
+    group: 'tcp',
+    columns: {
+      '1': { name: 'tcpConnState',         role: 'metric' },
+      '2': { name: 'tcpConnLocalAddress',  role: 'index' },
+      '3': { name: 'tcpConnLocalPort',     role: 'index' },
+      '4': { name: 'tcpConnRemAddress',    role: 'index' },
+      '5': { name: 'tcpConnRemPort',       role: 'index' },
+    }
+  },
+  '1.3.6.1.2.1.25.2.3': {
+    name: 'hrStorageTable', mib: 'HOST-RESOURCES-MIB',
+    label: 'Storage Table',
+    group: 'storage',
+    columns: {
+      '1': { name: 'hrStorageIndex',       role: 'index' },
+      '2': { name: 'hrStorageType',        role: 'tag',  tagName: 'storage_type' },
+      '3': { name: 'hrStorageDescr',       role: 'tag',  tagName: 'storage_desc' },
+      '4': { name: 'hrStorageAllocationUnits', role: 'metric' },
+      '5': { name: 'hrStorageSize',        role: 'metric' },
+      '6': { name: 'hrStorageUsed',        role: 'metric' },
+      '7': { name: 'hrStorageAllocationFailures', role: 'metric' },
+    }
+  },
+  '1.3.6.1.2.1.25.3.2': {
+    name: 'hrDeviceTable', mib: 'HOST-RESOURCES-MIB',
+    label: 'Device Table',
+    group: 'device',
+    columns: {
+      '1': { name: 'hrDeviceIndex',  role: 'index' },
+      '2': { name: 'hrDeviceType',   role: 'tag',  tagName: 'device_type' },
+      '3': { name: 'hrDeviceDescr',  role: 'tag',  tagName: 'device_desc' },
+      '5': { name: 'hrDeviceStatus', role: 'metric' },
+      '6': { name: 'hrDeviceErrors', role: 'metric' },
+    }
+  },
+  '1.3.6.1.2.1.47.1.1.1': {
+    name: 'entPhysicalTable', mib: 'ENTITY-MIB',
+    label: 'Physical Entity Table',
+    group: 'entity',
+    columns: {
+      '1':  { name: 'entPhysicalIndex',       role: 'index' },
+      '2':  { name: 'entPhysicalDescr',        role: 'tag',  tagName: 'ent_desc' },
+      '4':  { name: 'entPhysicalClass',        role: 'tag',  tagName: 'ent_class' },
+      '7':  { name: 'entPhysicalName',         role: 'tag',  tagName: 'ent_name' },
+      '11': { name: 'entPhysicalSerialNum',    role: 'tag',  tagName: 'ent_serial' },
+      '13': { name: 'entPhysicalModelName',    role: 'tag',  tagName: 'ent_model' },
+    }
+  },
+};
+
+// Vendor sysObjectID prefix map
+const VENDORS = {
+  '1.3.6.1.4.1.9':    { name: 'Cisco Systems',     slug: 'cisco' },
+  '1.3.6.1.4.1.311':  { name: 'Microsoft',          slug: 'microsoft' },
+  '1.3.6.1.4.1.2636': { name: 'Juniper Networks',   slug: 'juniper' },
+  '1.3.6.1.4.1.25506':{ name: 'H3C / HPE Comware',  slug: 'h3c' },
+  '1.3.6.1.4.1.2011': { name: 'Huawei',             slug: 'huawei' },
+  '1.3.6.1.4.1.3375': { name: 'F5 Networks',        slug: 'f5' },
+  '1.3.6.1.4.1.12356':{ name: 'Fortinet',           slug: 'fortinet' },
+  '1.3.6.1.4.1.8072': { name: 'Net-SNMP',           slug: 'net-snmp' },
+  '1.3.6.1.4.1.6876': { name: 'VMware',             slug: 'vmware' },
+  '1.3.6.1.4.1.11':   { name: 'HP / HPE',           slug: 'hp' },
+  '1.3.6.1.4.1.43':   { name: '3Com',               slug: '3com' },
+  '1.3.6.1.4.1.4526': { name: 'Netgear',            slug: 'netgear' },
+  '1.3.6.1.4.1.171':  { name: 'D-Link',             slug: 'dlink' },
+  '1.3.6.1.4.1.890':  { name: 'Zyxel',              slug: 'zyxel' },
+  '1.3.6.1.4.1.1916': { name: 'Extreme Networks',   slug: 'extreme' },
+  '1.3.6.1.4.1.6027': { name: 'Force10/Dell Networking', slug: 'force10' },
+  '1.3.6.1.4.1.30065':{ name: 'Arista Networks',    slug: 'arista' },
+  '1.3.6.1.4.1.14988':{ name: 'Mikrotik',           slug: 'mikrotik' },
+  '1.3.6.1.4.1.5624': { name: 'Enterasys',          slug: 'enterasys' },
+  '1.3.6.1.4.1.45':   { name: 'Nortel/Avaya',       slug: 'nortel' },
+  '1.3.6.1.4.1.674':  { name: 'Dell',               slug: 'dell' },
+  '1.3.6.1.4.1.232':  { name: 'HP ProLiant',        slug: 'hp-proliant' },
+  '1.3.6.1.4.1.318':  { name: 'APC/Schneider',      slug: 'apc' },
+  '1.3.6.1.4.1.534':  { name: 'Eaton/Powerware',    slug: 'eaton' },
+  '1.3.6.1.4.1.1588': { name: 'Brocade',            slug: 'brocade' },
+  '1.3.6.1.4.1.1872': { name: 'Alteon/Radware',     slug: 'radware' },
+  '1.3.6.1.4.1.9694': { name: 'Palo Alto Networks', slug: 'paloalto' },
+  '1.3.6.1.4.1.25461':{ name: 'Palo Alto Networks', slug: 'paloalto' },
+};
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let currentFileContent = null;
+let parsedData = null;
+let genericYaml = '';
+let resolvedOIDs = {};  // oid → {name, mib, syntax, description, units}
+let serverOnline = false;
+
+// ─── Server health check ──────────────────────────────────────────────────────
+
+async function checkServer() {
+  const dot   = document.getElementById('mib-dot');
+  const label = document.getElementById('mib-label');
+  try {
+    const r = await fetch('/health', { signal: AbortSignal.timeout(2000) });
+    if (r.ok) {
+      serverOnline = true;
+      dot.className   = 'mib-dot online';
+      label.innerHTML = '<strong>MIB lookup active</strong> — enterprise OIDs will be resolved via <a href="https://mibs.observium.org" target="_blank">Observium</a>';
+      return;
+    }
+  } catch (_) {}
+  serverOnline = false;
+  dot.className   = 'mib-dot offline';
+  label.innerHTML = 'Run <code style="background:#1e2235;padding:1px 5px;border-radius:3px;font-size:10px">python app.py</code> to enable MIB name lookup';
+}
+
+checkServer();
+
+// ─── OID enrichment ───────────────────────────────────────────────────────────
+
+async function enrichWithMibNames(grouped) {
+  if (!serverOnline) return;
+
+  const oids = [];
+  for (const t of grouped.enterpriseTables) {
+    for (const c of t.columns) oids.push(c.colOid);
+  }
+  for (const s of grouped.enterpriseScalars) oids.push(s.oid);
+  if (oids.length === 0) return;
+
+  const bar  = document.getElementById('resolving-bar');
+  const text = document.getElementById('resolving-text');
+  bar.classList.add('visible');
+  text.textContent = `Resolving ${oids.length} enterprise OID names via Observium…`;
+
+  try {
+    const r = await fetch('/resolve-oids', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oids }),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const count = Object.keys(data).length;
+      Object.assign(resolvedOIDs, data);
+
+      // Update the "Enterprise OIDs" stat
+      const resolved = count;
+      const total = oids.length;
+      document.getElementById('stat-unknown').textContent =
+        total > 0 ? `${resolved}/${total} resolved` : '0';
+
+      // Regenerate profile with real names
+      const { device, grouped: g } = parsedData;
+      genericYaml = generateGenericProfile(device, g);
+      renderOutput();
+
+      // Update info bar
+      const warningsEl = document.getElementById('warnings');
+      const unresolved = total - resolved;
+      if (unresolved > 0) {
+        warningsEl.classList.add('visible');
+        warningsEl.innerHTML = `<span>ℹ ${resolved} enterprise OID(s) resolved. ${unresolved} still unrecognized — search <strong># AUTO</strong> to rename them.</span>`;
+      } else if (total > 0) {
+        warningsEl.classList.add('visible');
+        warningsEl.innerHTML = `<span style="color:#22c55e">✓ All ${resolved} enterprise OID(s) resolved from Observium MIB database.</span>`;
+      } else {
+        warningsEl.classList.remove('visible');
+      }
+    }
+  } catch (_) {}
+  finally {
+    bar.classList.remove('visible');
+  }
+}
+
+// ─── File handling ────────────────────────────────────────────────────────────
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragging');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentFileContent = e.target.result;
+    document.getElementById('filename-label').textContent = file.name;
+    document.getElementById('filename-label').style.display = 'block';
+    dropZone.classList.add('has-file');
+    const icon = document.getElementById('drop-icon');
+    icon.innerHTML = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>';
+    icon.setAttribute('stroke', '#22c55e');
+    document.getElementById('process-btn').disabled = false;
+    // Auto-process
+    processFile();
+  };
+  reader.readAsText(file);
+}
+
+// ─── Parsing ──────────────────────────────────────────────────────────────────
+
+function parseSnmpWalk(text) {
+  const lines = text.split('\n');
+  const entries = [];
+  let pending = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Continuation of multi-line string value (no leading OID)
+    if (pending && !trimmed.startsWith('.')) {
+      pending.value += ' ' + trimmed;
+      continue;
+    }
+
+    if (pending) entries.push(pending);
+    pending = null;
+
+    // Match: .OID = TYPE: value   or   .OID = value
+    const m = trimmed.match(/^([\.\d]+)\s*=\s*(?:([A-Za-z0-9\-]+):\s*)?(.*)$/);
+    if (!m) continue;
+
+    let oid = m[1].replace(/^\./, '');
+    const type = m[2] || 'UNKNOWN';
+    const value = m[3] || '';
+
+    // Clean OID value references (e.g. "OID: .1.2.3" → "1.2.3")
+    let cleanValue = value.trim();
+    if (type === 'OID') cleanValue = cleanValue.replace(/^\./, '');
+
+    pending = { oid, type, value: cleanValue };
+  }
+  if (pending) entries.push(pending);
+  return entries;
+}
+
+function detectDevice(entries) {
+  let sysDescr = '', sysObjectID = '';
+  for (const e of entries) {
+    if (e.oid === '1.3.6.1.2.1.1.1.0') sysDescr = e.value;
+    if (e.oid === '1.3.6.1.2.1.1.2.0') sysObjectID = e.value.replace(/^\./, '');
+  }
+
+  let vendor = 'Unknown Vendor';
+  let slug = 'unknown';
+  if (sysObjectID) {
+    for (const [prefix, info] of Object.entries(VENDORS).sort((a,b) => b[0].length - a[0].length)) {
+      if (sysObjectID.startsWith(prefix)) {
+        vendor = info.name;
+        slug = info.slug;
+        break;
+      }
+    }
+  }
+
+  return { sysDescr, sysObjectID, vendor, slug };
+}
+
+// Infer metric role from the SNMP wire type (no MIB needed)
+function snmpTypeRole(type) {
+  if (!type) return 'metric';
+  const t = type.toUpperCase();
+  if (['STRING', 'IPADDRESS', 'NETWORKADDRESS', 'OID', 'BITS', 'OPAQUE'].includes(t)) return 'tag';
+  if (['COUNTER32', 'COUNTER64', 'GAUGE32', 'UNSIGNED32', 'INTEGER', 'INTEGER32',
+       'TIMETICKS', 'UNSIGNED', 'GAUGE'].includes(t)) return 'metric';
+  return 'metric';
+}
+
+// Generate a readable name from an OID, using the enterprise sub-tree if present
+function oidToName(oid) {
+  if (oid.startsWith('1.3.6.1.4.1.')) {
+    return 'ent_' + oid.slice('1.3.6.1.4.1.'.length).replace(/\./g, '_');
+  }
+  const parts = oid.split('.');
+  return 'oid_' + parts.slice(-4).join('_');
+}
+
+function groupOIDs(entries) {
+  const scalarsFound = [];
+  const tableEntries = {};   // known tableOID → { colNum → Set<instance> }
+  const unknownEntries = []; // entries not matched to any known OID/table
+
+  for (const e of entries) {
+    const oid = e.oid;
+
+    if (SCALARS[oid]) {
+      scalarsFound.push({ ...e, info: SCALARS[oid] });
+      continue;
+    }
+
+    // Match against known table definitions (tableBase.1.colNum.instance...)
+    let matched = false;
+    for (const [tableOid, tableDef] of Object.entries(TABLES)) {
+      const prefix = tableOid + '.1.';
+      if (oid.startsWith(prefix)) {
+        const rest = oid.slice(prefix.length);
+        const parts = rest.split('.');
+        const colNum = parts[0];
+        if (tableDef.columns[colNum]) {
+          const instance = parts.slice(1).join('.');
+          if (!tableEntries[tableOid]) tableEntries[tableOid] = {};
+          if (!tableEntries[tableOid][colNum]) tableEntries[tableOid][colNum] = new Set();
+          tableEntries[tableOid][colNum].add(instance);
+          matched = true;
+          break;
+        }
+      }
+    }
+    if (!matched) unknownEntries.push(e);
+  }
+
+  // ── Detect enterprise/unknown table structure from raw OID patterns ──
+  //
+  // Standard SNMP table OID layout: tableBase . 1 . colIndex . rowInstance(s)
+  //
+  // Step 1: group by column prefix (everything except the row instance)
+  //         → prefixes with >1 distinct last-segment are confirmed table columns
+  const colPrefixMap = new Map(); // colPrefix → Map<lastSeg, snmpType>
+  for (const e of unknownEntries) {
+    const parts = e.oid.split('.');
+    if (parts.length < 2) continue;
+    const colPrefix = parts.slice(0, -1).join('.');
+    const lastSeg   = parts[parts.length - 1];
+    if (!colPrefixMap.has(colPrefix)) colPrefixMap.set(colPrefix, new Map());
+    colPrefixMap.get(colPrefix).set(lastSeg, e.type);
+  }
+
+  const confirmedCols = new Map(); // colPrefix → Map<instance, type>  (size > 1)
+  const singletons    = [];        // {oid, type} — only one instance seen
+
+  for (const [colPrefix, instanceMap] of colPrefixMap) {
+    if (instanceMap.size > 1) {
+      confirmedCols.set(colPrefix, instanceMap);
+    } else {
+      const [inst, type] = [...instanceMap][0];
+      singletons.push({ oid: colPrefix + '.' + inst, type });
+    }
+  }
+
+  // Step 2: group confirmed column prefixes by their parent ("entry") prefix
+  //         colPrefix = entryPrefix . colIndex
+  const entryGroups = new Map(); // entryPrefix → Map<colIndex, instanceMap>
+  for (const [colPrefix, instanceMap] of confirmedCols) {
+    const parts      = colPrefix.split('.');
+    const colIndex   = parts[parts.length - 1];
+    const entryPrefix = parts.slice(0, -1).join('.');
+    if (!entryGroups.has(entryPrefix)) entryGroups.set(entryPrefix, new Map());
+    entryGroups.get(entryPrefix).set(colIndex, instanceMap);
+  }
+
+  // Step 3: derive tableOid from entryPrefix (strip trailing ".1" if present)
+  const enterpriseTables = [];
+  for (const [entryPrefix, colMap] of entryGroups) {
+    const parts     = entryPrefix.split('.');
+    const entrySub  = parts[parts.length - 1];
+    const tableOid  = entrySub === '1' ? parts.slice(0, -1).join('.') : entryPrefix;
+    const tableName = oidToName(tableOid) + '_table';
+    const columns   = [];
+    for (const [colIndex, instanceMap] of colMap) {
+      // Use the first SNMP type seen for this column to infer role
+      const firstType = [...instanceMap.values()][0];
+      const role      = snmpTypeRole(firstType);
+      const colOid    = entryPrefix + '.' + colIndex;
+      columns.push({ colIndex, colOid, role, snmpType: firstType,
+                     name: oidToName(colOid) });
+    }
+    enterpriseTables.push({ tableOid, entryPrefix, tableName, columns });
+  }
+
+  // Step 4: singletons that look like scalars (.0 instance or true single-instance)
+  const enterpriseScalars = singletons.map(s => ({
+    ...s,
+    name: oidToName(s.oid),
+    role: snmpTypeRole(s.type),
+  }));
+
+  return { scalarsFound, tableEntries, enterpriseTables, enterpriseScalars };
+}
+
+// ─── Profile generation ───────────────────────────────────────────────────────
+
+function getOptions() {
+  return {
+    includeTags:    document.getElementById('opt-tags').classList.contains('on'),
+    includeIpTables: document.getElementById('opt-ip-tables').classList.contains('on'),
+    includeRouting: document.getElementById('opt-routing').classList.contains('on'),
+    includeHC:      document.getElementById('opt-hc').classList.contains('on'),
+  };
+}
+
+// ─── Generic (tool-agnostic) profile ─────────────────────────────────────────
+
+function snmpTypeString(type) {
+  const t = (type || '').toUpperCase();
+  if (['COUNTER32', 'COUNTER64'].includes(t)) return 'counter';
+  if (['GAUGE32', 'UNSIGNED32', 'INTEGER', 'INTEGER32', 'UNSIGNED'].includes(t)) return 'gauge';
+  if (t === 'TIMETICKS') return 'timeticks';
+  if (t === 'IPADDRESS') return 'ipaddress';
+  if (t === 'STRING') return 'string';
+  return 'gauge';
+}
+
+function generateGenericProfile(device, grouped) {
+  const opts = getOptions();
+  const { scalarsFound, tableEntries, enterpriseTables, enterpriseScalars } = grouped;
+  const lines = [];
+  const date = new Date().toISOString().slice(0, 10);
+
+  lines.push(`# SNMP Profile`);
+  lines.push(`# Generated: ${date}`);
+  lines.push(`# Device:    ${device.vendor}`);
+  lines.push(`# sysDescr:  ${device.sysDescr.substring(0, 80).replace(/\n/g, ' ')}`);
+  lines.push('');
+
+  if (device.sysObjectID) {
+    lines.push(`sysobjectid: ${device.sysObjectID}`);
+    lines.push('');
+  }
+
+  // ── Scalar metrics ────────────────────────────────────────────────────────
+  const metricScalars = scalarsFound.filter(s => s.info.role === 'metric');
+  if (metricScalars.length) {
+    lines.push('scalars:');
+    for (const s of metricScalars) {
+      lines.push(`  - oid:  ${s.oid}`);
+      lines.push(`    name: ${s.info.name}`);
+      lines.push(`    mib:  ${s.info.mib}`);
+      lines.push(`    type: ${s.info.type}`);
+    }
+    lines.push('');
+  }
+
+  // ── Tables ────────────────────────────────────────────────────────────────
+  const tableBlocks = [];
+
+  // Known tables
+  for (const [tableOid, colMap] of Object.entries(tableEntries)) {
+    const def = TABLES[tableOid];
+    if (!def) continue;
+    if (def.group === 'routing' && !opts.includeRouting) continue;
+    if (def.group === 'ip' && !opts.includeIpTables) continue;
+
+    const metrics = [], tags = [];
+    for (const [colNum, _] of Object.entries(colMap)) {
+      const col = def.columns[colNum];
+      if (!col || col.role === 'index') continue;
+      if (col.hc && !opts.includeHC) continue;
+      const entry = { oid: `${tableOid}.1.${colNum}`, name: col.name };
+      if (col.role === 'tag' && opts.includeTags) tags.push({ ...entry, tag: col.tagName || col.name });
+      else if (col.role === 'metric') metrics.push({ ...entry, type: 'counter' });
+    }
+    if (metrics.length || tags.length)
+      tableBlocks.push({ oid: tableOid, name: def.name, mib: def.mib, label: def.label, metrics, tags });
+  }
+
+  // Enterprise tables
+  for (const t of enterpriseTables) {
+    const metrics = [], tags = [];
+    for (const c of t.columns) {
+      const name = resolvedName(c.colOid, c.name);
+      const note = resolvedOIDs[c.colOid] ? '' : '  # auto-named';
+      if (c.role === 'metric') metrics.push({ oid: c.colOid, name, type: snmpTypeString(c.snmpType), note });
+      else if (c.role === 'tag' && opts.includeTags) tags.push({ oid: c.colOid, name, tag: name, note });
+    }
+    if (metrics.length || tags.length) {
+      const anyResolved = t.columns.some(c => resolvedOIDs[c.colOid]);
+      const mib  = anyResolved ? resolvedMib(t.columns.find(c => resolvedOIDs[c.colOid])?.colOid, 'UNKNOWN') : 'UNKNOWN';
+      const name = anyResolved ? resolvedTableName(t.tableOid, t.columns, t.tableName) : t.tableName;
+      tableBlocks.push({ oid: t.tableOid, name, mib, label: null, metrics, tags, isEnterprise: !anyResolved });
+    }
+  }
+
+  if (tableBlocks.length) {
+    lines.push('tables:');
+    for (const tbl of tableBlocks) {
+      if (tbl.label) lines.push(`  # ${tbl.label}`);
+      else if (tbl.isEnterprise) lines.push(`  # Enterprise table — rename as needed`);
+      lines.push(`  - oid:  ${tbl.oid}`);
+      lines.push(`    name: ${tbl.name}`);
+      lines.push(`    mib:  ${tbl.mib}`);
+      if (tbl.metrics.length) {
+        lines.push(`    metrics:`);
+        for (const m of tbl.metrics) lines.push(`      - { oid: ${m.oid}, name: ${m.name}, type: ${m.type} }${m.note||''}`);
+      }
+      if (tbl.tags.length) {
+        lines.push(`    tags:`);
+        for (const t of tbl.tags) lines.push(`      - { oid: ${t.oid}, name: ${t.name}, tag: ${t.tag} }${t.note||''}`);
+      }
+    }
+    lines.push('');
+  }
+
+  // ── Enterprise scalars ────────────────────────────────────────────────────
+  const entMetrics = enterpriseScalars.filter(s => s.role === 'metric');
+  if (entMetrics.length) {
+    lines.push('  # Enterprise scalars');
+    for (const s of entMetrics) {
+      const name = resolvedName(s.oid, s.name);
+      const note = resolvedOIDs[s.oid] ? '' : '  # auto-named';
+      lines.push(`  - { oid: ${s.oid}, name: ${name}, type: ${snmpTypeString(s.type)} }${note}`);
+    }
+    lines.push('');
+  }
+
+  // ── Device tags ───────────────────────────────────────────────────────────
+  if (opts.includeTags) {
+    const tagScalars = [
+      ...scalarsFound.filter(s => s.info.role === 'tag').map(s => ({ oid: s.oid, name: s.info.name, tag: s.info.name })),
+      ...enterpriseScalars.filter(s => s.role === 'tag').map(s => {
+        const name = resolvedName(s.oid, s.name);
+        return { oid: s.oid, name, tag: name };
+      }),
+    ];
+    if (tagScalars.length) {
+      lines.push('device_tags:');
+      for (const t of tagScalars) lines.push(`  - { oid: ${t.oid}, name: ${t.name}, tag: ${t.tag} }`);
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function emitKnownTable(lines, tableOid, colMap, tableDef, opts, format) {
+  if (tableDef.group === 'routing' && !opts.includeRouting) return false;
+  if (tableDef.group === 'ip' && !opts.includeIpTables) return false;
+
+  const symbols = [], tags = [];
+  for (const [colNum, instances] of Object.entries(colMap)) {
+    const colDef = tableDef.columns[colNum];
+    if (!colDef || colDef.role === 'index') continue;
+    if (colDef.hc && !opts.includeHC) continue;
+    if (colDef.role === 'tag' && opts.includeTags) tags.push({ colNum, colDef });
+    else if (colDef.role === 'metric') symbols.push({ colNum, colDef });
+  }
+  if (symbols.length === 0 && tags.length === 0) return false;
+
+  lines.push('');
+  lines.push(`  # ${tableDef.label}`);
+  if (format === 'datadog') {
+    lines.push(`  - MIB: ${tableDef.mib}`);
+    lines.push(`    table:`);
+    lines.push(`      OID: ${tableOid}`);
+    lines.push(`      name: ${tableDef.name}`);
+    if (symbols.length) {
+      lines.push(`    symbols:`);
+      for (const { colNum, colDef } of symbols) {
+        lines.push(`      - OID: ${tableOid}.1.${colNum}`);
+        lines.push(`        name: ${colDef.name}`);
+      }
+    }
+    if (tags.length) {
+      lines.push(`    metric_tags:`);
+      for (const { colNum, colDef } of tags) {
+        lines.push(`      - tag: ${colDef.tagName || colDef.name}`);
+        lines.push(`        column:`);
+        lines.push(`          OID: ${tableOid}.1.${colNum}`);
+        lines.push(`          name: ${colDef.name}`);
+      }
+    }
+  } else {
+    lines.push(`  - name: ${tableDef.name}`);
+    lines.push(`    oid: ${tableOid}`);
+    lines.push(`    type: table`);
+    if (symbols.length) {
+      lines.push(`    symbols:`);
+      for (const { colNum, colDef } of symbols) {
+        lines.push(`      - name: ${colDef.name}`);
+        lines.push(`        oid: ${tableOid}.1.${colNum}`);
+      }
+    }
+    if (tags.length) {
+      lines.push(`    metric_tags:`);
+      for (const { colNum, colDef } of tags) {
+        lines.push(`      - column:`);
+        lines.push(`          name: ${colDef.name}`);
+        lines.push(`          oid: ${tableOid}.1.${colNum}`);
+        lines.push(`        tag: ${colDef.tagName || colDef.name}`);
+      }
+    }
+  }
+  return true;
+}
+
+// Return the best available name+mib for a column OID
+function resolvedName(colOid, fallback) {
+  return resolvedOIDs[colOid] ? resolvedOIDs[colOid].name : fallback;
+}
+function resolvedMib(colOid, fallback) {
+  return resolvedOIDs[colOid] ? resolvedOIDs[colOid].mib : fallback;
+}
+function resolvedTableName(tableOid, columns, fallback) {
+  // If any column in this table resolved, derive a table name from the MIB + first column
+  for (const c of columns) {
+    const r = resolvedOIDs[c.colOid];
+    if (r) return r.mib.toLowerCase().replace(/-mib$/i, '').replace(/-/g, '_') + '_table';
+  }
+  return fallback;
+}
+
+function emitEnterpriseTable(lines, t, opts, format) {
+  const symbols = t.columns.filter(c => c.role === 'metric');
+  const tags    = opts.includeTags ? t.columns.filter(c => c.role === 'tag') : [];
+  if (symbols.length === 0 && tags.length === 0) return;
+
+  // Determine if this table has any resolved names
+  const anyResolved = t.columns.some(c => resolvedOIDs[c.colOid]);
+  const tableMib  = anyResolved ? resolvedMib(t.columns.find(c => resolvedOIDs[c.colOid])?.colOid, 'AUTO') : 'AUTO';
+  const tableName = anyResolved ? resolvedTableName(t.tableOid, t.columns, t.tableName) : t.tableName;
+  const autoNote  = anyResolved ? '' : '  # AUTO — rename as needed';
+
+  lines.push('');
+  if (!anyResolved) lines.push(`  # Enterprise table (auto-detected) — rename OID names as needed`);
+  if (format === 'datadog') {
+    lines.push(`  - MIB: ${tableMib}`);
+    lines.push(`    table:`);
+    lines.push(`      OID: ${t.tableOid}`);
+    lines.push(`      name: ${tableName}${autoNote}`);
+    if (symbols.length) {
+      lines.push(`    symbols:`);
+      for (const c of symbols) {
+        const name = resolvedName(c.colOid, c.name);
+        const note = resolvedOIDs[c.colOid] ? '' : `  # AUTO (${c.snmpType})`;
+        lines.push(`      - OID: ${c.colOid}`);
+        lines.push(`        name: ${name}${note}`);
+      }
+    }
+    if (tags.length) {
+      lines.push(`    metric_tags:`);
+      for (const c of tags) {
+        const name = resolvedName(c.colOid, c.name);
+        const note = resolvedOIDs[c.colOid] ? '' : `  # AUTO (${c.snmpType})`;
+        lines.push(`      - tag: ${name}`);
+        lines.push(`        column:`);
+        lines.push(`          OID: ${c.colOid}`);
+        lines.push(`          name: ${name}${note}`);
+      }
+    }
+  } else {
+    lines.push(`  - name: ${tableName}${autoNote}`);
+    lines.push(`    oid: ${t.tableOid}`);
+    lines.push(`    type: table`);
+    if (symbols.length) {
+      lines.push(`    symbols:`);
+      for (const c of symbols) {
+        const name = resolvedName(c.colOid, c.name);
+        const note = resolvedOIDs[c.colOid] ? '' : `  # AUTO (${c.snmpType})`;
+        lines.push(`      - name: ${name}${note}`);
+        lines.push(`        oid: ${c.colOid}`);
+      }
+    }
+    if (tags.length) {
+      lines.push(`    metric_tags:`);
+      for (const c of tags) {
+        const name = resolvedName(c.colOid, c.name);
+        const note = resolvedOIDs[c.colOid] ? '' : `  # AUTO (${c.snmpType})`;
+        lines.push(`      - column:`);
+        lines.push(`          name: ${name}${note}`);
+        lines.push(`          oid: ${c.colOid}`);
+        lines.push(`        tag: ${name}`);
+      }
+    }
+  }
+}
+
+function generateDatadogProfile(device, grouped) {
+  const opts = getOptions();
+  const lines = [];
+  const { scalarsFound, tableEntries, enterpriseTables, enterpriseScalars } = grouped;
+
+  lines.push(`# Datadog SNMP Profile`);
+  lines.push(`# Generated by SNMP Profile Generator`);
+  lines.push(`# Device: ${device.vendor}`);
+  lines.push(`# sysDescr: ${device.sysDescr.substring(0, 80).replace(/\n/g, ' ')}`);
+  lines.push('');
+
+  if (device.sysObjectID) {
+    lines.push('sysobjectid:');
+    lines.push(`  - ${device.sysObjectID}`);
+    lines.push('');
+  }
+
+  lines.push('metadata:');
+  lines.push('  device:');
+  lines.push('    fields:');
+  if (scalarsFound.find(s => s.oid === '1.3.6.1.2.1.1.1.0')) {
+    lines.push('      description:');
+    lines.push('        symbol:');
+    lines.push(`          OID: 1.3.6.1.2.1.1.1.0`);
+    lines.push(`          name: sysDescr`);
+  }
+  if (scalarsFound.find(s => s.oid === '1.3.6.1.2.1.1.5.0')) {
+    lines.push('      name:');
+    lines.push('        symbol:');
+    lines.push(`          OID: 1.3.6.1.2.1.1.5.0`);
+    lines.push(`          name: sysName`);
+  }
+  lines.push('');
+
+  lines.push('metrics:');
+
+  // Known scalars
+  let wroteScalarHeader = false;
+  for (const s of scalarsFound) {
+    if (s.info.role !== 'metric') continue;
+    if (!wroteScalarHeader) { lines.push(`  # Scalar metrics`); wroteScalarHeader = true; }
+    lines.push(`  - MIB: ${s.info.mib}`);
+    lines.push(`    symbol:`);
+    lines.push(`      OID: ${s.oid}`);
+    lines.push(`      name: ${s.info.name}`);
+  }
+
+  // Known tables
+  for (const [tableOid, colMap] of Object.entries(tableEntries)) {
+    const def = TABLES[tableOid];
+    if (def) emitKnownTable(lines, tableOid, colMap, def, opts, 'datadog');
+  }
+
+  // Enterprise scalars
+  const entMetricScalars = enterpriseScalars.filter(s => s.role === 'metric');
+  if (entMetricScalars.length > 0) {
+    lines.push('');
+    lines.push(`  # Enterprise scalars (auto-detected)`);
+    for (const s of entMetricScalars) {
+      const name = resolvedName(s.oid, s.name);
+      const mib  = resolvedMib(s.oid, 'AUTO');
+      const note = resolvedOIDs[s.oid] ? '' : `  # AUTO (${s.type})`;
+      lines.push(`  - MIB: ${mib}`);
+      lines.push(`    symbol:`);
+      lines.push(`      OID: ${s.oid}`);
+      lines.push(`      name: ${name}${note}`);
+    }
+  }
+
+  // Enterprise tables
+  for (const t of enterpriseTables) {
+    emitEnterpriseTable(lines, t, opts, 'datadog');
+  }
+
+  // Global metric_tags
+  lines.push('');
+  lines.push('metric_tags:');
+  if (opts.includeTags) {
+    for (const s of scalarsFound) {
+      if (s.info.role !== 'tag') continue;
+      lines.push(`  - OID: ${s.oid}`);
+      lines.push(`    symbol: ${s.info.name}`);
+      lines.push(`    tag: ${s.info.name.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}`);
+    }
+    for (const s of enterpriseScalars.filter(s => s.role === 'tag')) {
+      const name = resolvedName(s.oid, s.name);
+      const note = resolvedOIDs[s.oid] ? '' : `  # AUTO`;
+      lines.push(`  - OID: ${s.oid}`);
+      lines.push(`    symbol: ${name}${note}`);
+      lines.push(`    tag: ${name}`);
+    }
+  }
+
+  return { yaml: lines.join('\n'), warnings: [] };
+}
+
+function generateNewRelicProfile(device, grouped) {
+  const opts = getOptions();
+  const lines = [];
+  const { scalarsFound, tableEntries, enterpriseTables, enterpriseScalars } = grouped;
+
+  const oidParts  = device.sysObjectID ? device.sysObjectID.split('.') : [];
+  const oidSuffix = oidParts.length > 0 ? oidParts[oidParts.length - 1] : 'unknown';
+
+  lines.push(`# New Relic SNMP Profile (ktranslate format)`);
+  lines.push(`# Generated by SNMP Profile Generator`);
+  lines.push(`# Device: ${device.vendor}`);
+  lines.push('');
+  lines.push(`name: ${device.slug}-${oidSuffix}`);
+  if (device.sysObjectID) {
+    lines.push(`sysobjectid:`);
+    lines.push(`  - .${device.sysObjectID}`);
+  }
+  lines.push('');
+  lines.push(`# ${device.sysDescr.substring(0, 100).replace(/\n/g, ' ')}`);
+  lines.push('');
+  lines.push('metrics:');
+
+  // Known scalars
+  for (const s of scalarsFound) {
+    if (s.info.role === 'metadata') continue;
+    lines.push(`  - name: ${s.info.name}`);
+    lines.push(`    oid: ${s.oid}`);
+    const t = s.info.type;
+    lines.push(`    type: ${t === 'counter' ? 'counter' : (s.info.role === 'tag' || t === 'string') ? 'attribute' : 'gauge'}`);
+  }
+
+  // Known tables
+  for (const [tableOid, colMap] of Object.entries(tableEntries)) {
+    const def = TABLES[tableOid];
+    if (def) emitKnownTable(lines, tableOid, colMap, def, opts, 'newrelic');
+  }
+
+  // Enterprise scalars
+  const entMetricScalars = enterpriseScalars.filter(s => s.role === 'metric');
+  if (entMetricScalars.length > 0) {
+    lines.push('');
+    lines.push(`  # Enterprise scalars (auto-detected)`);
+    for (const s of entMetricScalars) {
+      const name = resolvedName(s.oid, s.name);
+      const note = resolvedOIDs[s.oid] ? '' : `  # AUTO (${s.type})`;
+      lines.push(`  - name: ${name}${note}`);
+      lines.push(`    oid: ${s.oid}`);
+      lines.push(`    type: gauge`);
+    }
+  }
+
+  // Enterprise tables
+  for (const t of enterpriseTables) {
+    emitEnterpriseTable(lines, t, opts, 'newrelic');
+  }
+
+  return { yaml: lines.join('\n'), warnings: [] };
+}
+
+// ─── Main process ─────────────────────────────────────────────────────────────
+
+function processFile() {
+  if (!currentFileContent) return;
+
+  resolvedOIDs = {};  // reset on each new file/regenerate
+
+  const btn = document.getElementById('process-btn');
+  btn.textContent = 'Processing…';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    try {
+      const entries = parseSnmpWalk(currentFileContent);
+      const device = detectDevice(entries);
+      const grouped = groupOIDs(entries);
+      parsedData = { entries, device, grouped };
+
+      // Update device info
+      const deviceInfo = document.getElementById('device-info');
+      deviceInfo.classList.add('visible');
+      document.getElementById('device-vendor').textContent = device.vendor;
+      document.getElementById('device-sysoid').textContent = device.sysObjectID ? `OID: ${device.sysObjectID}` : '';
+      document.getElementById('device-sysdescr').textContent = device.sysDescr.substring(0, 120).replace(/\n/g, ' ');
+
+      // Update stats
+      const statsPanel = document.getElementById('stats-panel');
+      statsPanel.classList.add('visible');
+      const entCount = grouped.enterpriseTables.length + grouped.enterpriseScalars.filter(s => s.role === 'metric').length;
+      document.getElementById('stat-total').textContent = entries.length.toLocaleString();
+      document.getElementById('stat-scalars').textContent = grouped.scalarsFound.filter(s => s.info.role === 'metric').length;
+      const knownTableCount = Object.keys(grouped.tableEntries).length;
+      document.getElementById('stat-tables').textContent = knownTableCount + grouped.enterpriseTables.length;
+      document.getElementById('stat-columns').textContent = Object.values(grouped.tableEntries).reduce((a, c) => a + Object.keys(c).length, 0);
+      document.getElementById('stat-unknown').textContent = entCount > 0 ? `${entCount} (auto-named)` : '0';
+
+      // Generate profile
+      genericYaml = generateGenericProfile(device, grouped);
+
+      // Show info if enterprise OIDs were auto-named
+      const warningsEl = document.getElementById('warnings');
+      if (entCount > 0) {
+        warningsEl.classList.add('visible');
+        warningsEl.innerHTML = `<span>ℹ ${entCount} enterprise OID(s) included with auto-generated names — search for <strong># AUTO</strong> in the profile to rename them.</span>`;
+      } else {
+        warningsEl.classList.remove('visible');
+      }
+
+      // Show output immediately with auto-names
+      renderOutput();
+
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('output-toolbar').style.display = 'flex';
+      document.getElementById('yaml-output').style.display = 'block';
+
+      // Async: enrich enterprise OIDs with real names from Observium
+      enrichWithMibNames(grouped);
+
+    } catch (err) {
+      alert('Error parsing file: ' + err.message);
+    }
+
+    btn.textContent = 'Regenerate Profile';
+    btn.disabled = false;
+  }, 50);
+}
+
+function profileFilename(format) {
+  const device = parsedData?.device;
+  const slug = device?.slug || 'device';
+  const oidParts = device?.sysObjectID ? device.sysObjectID.split('.') : [''];
+  const suffix = oidParts[oidParts.length - 1];
+  if (format === 'datadog')  return `${slug}_${suffix}_datadog.yaml`;
+  if (format === 'newrelic') return `${slug}_${suffix}_newrelic.yaml`;
+  return `${slug}_${suffix}_snmp_profile.yaml`;
+}
+
+function renderOutput() {
+  document.getElementById('output-filename').textContent = profileFilename('generic');
+  document.getElementById('yaml-output').innerHTML = highlightYaml(genericYaml);
+}
+
+function highlightYaml(yaml) {
+  return yaml.split('\n').map(line => {
+    const escaped = line
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Comment
+    if (escaped.trimStart().startsWith('#')) {
+      return `<span style="color:#475569;font-style:italic">${escaped}</span>`;
+    }
+
+    // Key: value
+    return escaped.replace(/^(\s*)([\w\-]+)(\s*:)(\s*)(.*)$/, (_, indent, key, colon, space, val) => {
+      let valSpan = val;
+      if (val.startsWith("'") || val.startsWith('"') || (!val.match(/^[\d\.\-]+$/) && val && !val.startsWith('&') && !val.startsWith('*'))) {
+        if (val === 'true' || val === 'false' || val === 'null') {
+          valSpan = `<span style="color:#fbbf24">${val}</span>`;
+        } else if (val.match(/^[\d\.]+$/)) {
+          valSpan = `<span style="color:#fda4af">${val}</span>`;
+        } else if (val) {
+          valSpan = `<span style="color:#86efac">${val}</span>`;
+        }
+      } else if (val.match(/^[\d\.]+$/)) {
+        valSpan = `<span style="color:#fda4af">${val}</span>`;
+      }
+      return `${indent}<span style="color:#7dd3fc">${key}</span>${colon}${space}${valSpan}`;
+    }).replace(/^(\s*)(- )(.*)$/, (_, indent, dash, rest) => {
+      return `${indent}<span style="color:#c084fc">${dash}</span>${rest}`;
+    });
+  }).join('\n');
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+
+function toggleOption(btn) {
+  btn.classList.toggle('on');
+  if (parsedData) processFile();
+}
+
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  document.getElementById('export-menu').classList.toggle('open');
+}
+document.addEventListener('click', () => document.getElementById('export-menu')?.classList.remove('open'));
+
+function copyYaml() {
+  navigator.clipboard.writeText(genericYaml).then(() => {
+    const btn = event.target.closest('.btn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    setTimeout(() => { btn.innerHTML = orig; }, 1500);
+  });
+}
+
+function downloadYaml(format) {
+  document.getElementById('export-menu').classList.remove('open');
+  const { device, grouped } = parsedData;
+  let yaml, filename;
+  if (format === 'datadog') {
+    yaml = generateDatadogProfile(device, grouped).yaml;
+    filename = profileFilename('datadog');
+  } else if (format === 'newrelic') {
+    yaml = generateNewRelicProfile(device, grouped).yaml;
+    filename = profileFilename('newrelic');
+  } else {
+    yaml = genericYaml;
+    filename = profileFilename('generic');
+  }
+  const blob = new Blob([yaml], { type: 'text/yaml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>
